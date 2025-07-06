@@ -1,6 +1,8 @@
 // API Configuration and Service Layer
 const API_BASE_URL = "http://localhost:8000"
 
+// const API_BASE_URL = "https://budget-pay-api.onrender.com"
+
 // Types for API responses
 export interface ApiResponse<T> {
   data?: T
@@ -11,6 +13,18 @@ export interface ApiResponse<T> {
 export interface LoginResponse {
   access_token: string
   token_type: string
+}
+
+export interface UserRead {
+  id: string
+  email: string
+  is_active: boolean
+  is_verified: boolean
+  is_superuser: boolean
+  full_name: string | null
+  monthly_income: number | null
+  savings_goal_amount: number | null
+  savings_goal_deadline: string | null
 }
 
 export interface ApiError {
@@ -71,19 +85,26 @@ class ApiClient {
     try {
       const response = await fetch(url, config)
 
+      // Handle 204 No Content
       if (response.status === 204) {
         return { status: response.status }
       }
 
-      const data = await response.json()
+      // Try to parse JSON response
+      let data: any = null
+      try {
+        data = await response.json()
+      } catch {
+        // If JSON parsing fails, data remains null
+      }
 
       if (!response.ok) {
         const errorMessage =
-          typeof data.detail === "string"
+          data && typeof data.detail === "string"
             ? data.detail
-            : Array.isArray(data.detail)
+            : data && Array.isArray(data.detail)
               ? data.detail.map((err: any) => err.msg).join(", ")
-              : "An error occurred"
+              : `HTTP ${response.status}: ${response.statusText}`
 
         return {
           error: errorMessage,
@@ -108,10 +129,35 @@ class ApiClient {
     email: string
     password: string
     full_name?: string
-  }): Promise<ApiResponse<any>> {
+    is_active?: boolean
+    is_superuser?: boolean
+    is_verified?: boolean
+  }): Promise<ApiResponse<UserRead>> {
+    // Set default values for required fields
+    const requestData = {
+      is_active: true,
+      is_superuser: false,
+      is_verified: false,
+      ...userData,
+    }
+
     return this.request("/api/v1/auth/register", {
       method: "POST",
-      body: JSON.stringify(userData),
+      body: JSON.stringify(requestData),
+    })
+  }
+
+  async requestVerifyToken(email: string): Promise<ApiResponse<{ detail: string }>> {
+    return this.request("/api/v1/auth/request-verify-token", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    })
+  }
+
+  async verifyEmail(token: string): Promise<ApiResponse<UserRead>> {
+    return this.request("/api/v1/auth/verify", {
+      method: "POST",
+      body: JSON.stringify({ token }),
     })
   }
 
@@ -130,6 +176,20 @@ class ApiClient {
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body: formData.toString(),
+    })
+  }
+
+  async forgotPassword(email: string): Promise<ApiResponse<{ detail: string }>> {
+    return this.request("/api/v1/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    })
+  }
+
+  async resetPassword(token: string, password: string): Promise<ApiResponse<{ detail: string }>> {
+    return this.request("/api/v1/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ token, password }),
     })
   }
 

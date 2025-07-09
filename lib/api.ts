@@ -27,6 +27,10 @@ export interface UserRead {
   savings_goal_deadline: string | null
 }
 
+export interface ChatbotResponse {
+  response: string
+}
+
 export interface ApiError {
   detail: string | { msg: string; type: string }[]
 }
@@ -196,6 +200,14 @@ class ApiClient {
   async logout(): Promise<ApiResponse<void>> {
     return this.request("/api/v1/auth/jwt/logout", {
       method: "POST",
+    })
+  }
+
+  // Chatbot endpoint
+  async askChatbot(query: string): Promise<ApiResponse<ChatbotResponse>> {
+    return this.request("/api/v1/chatbot/ask", {
+      method: "POST",
+      body: JSON.stringify({ query }),
     })
   }
 
